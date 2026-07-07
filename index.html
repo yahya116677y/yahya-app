@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>غرفة الاجتماع</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body { font-family: 'Tajawal', system-ui, sans-serif; }
+        .video-tile video { transform: scaleX(-1); } /* mirror own view is toggled in JS */
+        .video-tile.remote video { transform: none; }
+        .btn-icon { transition: transform .15s ease, background-color .15s ease; }
+        .btn-icon:active { transform: scale(.94); }
+        .rec-dot { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<section id="landing" class="min-h-screen flex items-center justify-center p-6">
+    <div class="w-full max-w-md bg-slate-900/70 border border-slate-800 rounded-2xl p-8 shadow-xl">
+        <h1 class="text-3xl font-bold mb-2 text-center">غرفة الاجتماع</h1>
+        <p class="text-slate-400 text-center mb-8 text-sm">
+            حتى 10 مشاركين — كاميرا وميكروفون ومشاركة الشاشة فقط.
+        </p>
+
+        <label class="block text-sm mb-1 text-slate-300">اسمك</label>
+        <input id="inpName" type="text" placeholder="أدخل اسمك"
+               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 mb-4 outline-none focus:border-emerald-500" />
+
+        <label class="block text-sm mb-1 text-slate-300">رابط الغرفة (اختياري)</label>
+        <input id="inpRoom" type="text" placeholder="اتركه فارغًا لإنشاء غرفة جديدة"
+               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 mb-6 outline-none focus:border-emerald-500" />
+
+        <button id="btnEnter"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 rounded-lg py-2.5 font-semibold">
+            الدخول إلى الغرفة
+        </button>
+
+        <p id="landingErr" class="text-red-400 text-sm mt-3 hidden"></p>
+    </div>
+</section>
+
+<section id="meeting" class="hidden min-h-screen flex flex-col">
+    <header class="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <span class="text-emerald-400 font-bold">●</span>
+            <div>
+                <div class="text-sm text-slate-400">الغرفة</div>
+                <div id="lblRoomId" class="font-mono text-sm"></div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btnCopyLink"
+                    class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-3 py-1.5">
+                نسخ رابط الدعوة
+            </button>
+            <span id="lblCount" class="text-xs bg-slate-800 rounded-lg px-3 py-1.5">1 / 10</span>
+        </div>
+    </header>
+
+    <main id="grid" class="flex-1 p-3 grid gap-3
+                            grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 px-4 py-3">
+        <div class="flex flex-wrap items-center justify-center gap-3">
+            <button id="btnCam" class="btn-icon bg-slate-800 hover:bg-slate-700 rounded-full w-12 h-12 flex items-center justify-center" title="الكاميرا">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4-2v8l-4-2M3 6h12v12H3z"/></svg>
+            </button>
+            <button id="btnMic" class="btn-icon bg-slate-800 hover:bg-slate-700 rounded-full w-12 h-12 flex items-center justify-center" title="الميكروفون">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 19v3"/></svg>
+            </button>
+            <button id="btnScreen" class="btn-icon bg-slate-800 hover:bg-slate-700 rounded-full w-12 h-12 flex items-center justify-center" title="مشاركة الشاشة">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+            </button>
+
+            <div class="w-px h-8 bg-slate-700 mx-2"></div>
+
+            <div class="flex items-center gap-2 bg-slate-800 rounded-full px-3 py-1.5 text-sm">
+                <label class="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" name="recMode" value="mixed" checked class="accent-emerald-500"/>
+                    <span>ملف مدمج</span>
+                </label>
+                <label class="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" name="recMode" value="separate" class="accent-emerald-500"/>
+                    <span>ملفات منفصلة</span>
+                </label>
+            </div>
+
+            <button id="btnRec" class="bg-red-600 hover:bg-red-500 rounded-full px-4 h-12 flex items-center gap-2 font-semibold">
+                <span id="recIcon" class="w-3 h-3 rounded-full bg-white"></span>
+                <span id="recLabel">بدء التسجيل</span>
+            </button>
+
+            <div class="w-px h-8 bg-slate-700 mx-2"></div>
+
+            <button id="btnLeave" class="bg-slate-700 hover:bg-slate-600 rounded-full px-4 h-12 font-semibold">
+                مغادرة
+            </button>
+        </div>
+        <p id="recHint" class="text-center text-xs text-slate-400 mt-2 hidden"></p>
+    </footer>
+</section>
+
+<script src="recorder.js"></script>
+<script>
+/* =====================================================================
+ * Meeting client — signaling + WebRTC mesh + media controls.
+ * Recording is delegated to /recorder.js (window.Recorder).
+ * =================================================================== */
+
+const $ = (id) => document.getElementById(id);
+
+const state = {
+    ws: null,
+    peerId: null,
+    roomId: null,
+    name: null,
+    localStream: null,     // camera+mic
+    screenStream: null,    // when sharing
+    peers: new Map(),      // peerId -> { pc, name, stream, audioTrackForRec }
+    camOn: true,
+    micOn: true,
+    screenOn: false,
+    max: 10,
+};
+
+const ICE_CONFIG = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
+/* ---------- URL room param ---------- */
+const urlRoom = new URLSearchParams(location.search).get('room');
+if (urlRoom) $('inpRoom').value = urlRoom;
+
+/* ---------- Landing ---------- */
+$('btnEnter').addEventListener('click', enterRoom);
+
+async function enterRoom() {
+    const name = $('inpName').value.trim() || 'مشارك';
+    let roomId = $('inpRoom').value.trim();
+    if (!roomId) roomId = Math.random().toString(36).slice(2, 8);
+
+    try {
+        state.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    } catch (e) {
+        showLandingErr('يجب السماح باستخدام الكاميرا والميكروفون.');
+        return;
+    }
+
+    state.name = name;
+    state.roomId = roomId;
+
+    $('landing').classList.add('hidden');
+    $('meeting').classList.remove('hidden');
+    $('lblRoomId').textContent = roomId;
+
+    addTile('local', name + ' (أنت)', state.localStream, true);
+    connectWs();
+}
+
+function showLandingErr(msg) {
+    const el = $('landingErr');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+/* ---------- WebSocket signaling ---------- */
+function connectWs() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    state.ws = ws;
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'join', roomId: state.roomId, name: state.name }));
+    };
+
+    ws.onmessage = async (ev) => {
+        const msg = JSON.parse(ev.data);
+        switch (msg.type) {
+            case 'joined':
+                state.peerId = msg.peerId;
+                state.max    = msg.max;
+                updateCount();
+                // For each existing peer, create an offer.
+                for (const p of msg.peers) {
+                    await createPeer(p.peerId, p.name, /*initiator*/ true);
+                }
+                break;
+            case 'peer-joined':
+                await createPeer(msg.peerId, msg.name, /*initiator*/ false);
+                updateCount();
+                break;
+            case 'peer-left':
+                removePeer(msg.peerId);
+                updateCount();
+                break;
+            case 'offer': {
+                const p = state.peers.get(msg.from) || await createPeer(msg.from, 'مشارك', false);
+                await p.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                const ans = await p.pc.createAnswer();
+                await p.pc.setLocalDescription(ans);
+                ws.send(JSON.stringify({ type: 'answer', target: msg.from, sdp: ans }));
+                break;
+            }
+            case 'answer': {
+                const p = state.peers.get(msg.from);
+                if (p) await p.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                break;
+            }
+            case 'ice-candidate': {
+                const p = state.peers.get(msg.from);
+                if (p && msg.candidate) {
+                    try { await p.pc.addIceCandidate(msg.candidate); } catch (e) { /* ignore */ }
+                }
+                break;
+            }
+            case 'error':
+                if (msg.reason === 'room-full') {
+                    alert(`الغرفة ممتلئة (الحد الأقصى ${msg.max}).`);
+                    location.reload();
+                }
+                break;
+        }
+    };
+
+    ws.onclose = () => { /* silent */ };
+}
+
+/* ---------- WebRTC peer ---------- */
+async function createPeer(peerId, name, initiator) {
+    if (state.peers.has(peerId)) return state.peers.get(peerId);
+
+    const pc = new RTCPeerConnection(ICE_CONFIG);
+    const remoteStream = new MediaStream();
+    const entry = { pc, name, stream: remoteStream, audioTrackForRec: null };
+    state.peers.set(peerId, entry);
+
+    // Add local tracks
+    for (const track of state.localStream.getTracks()) pc.addTrack(track, state.localStream);
+    if (state.screenStream) {
+        for (const track of state.screenStream.getTracks()) pc.addTrack(track, state.screenStream);
+    }
+
+    pc.ontrack = (ev) => {
+        ev.streams[0].getTracks().forEach(t => {
+            if (!remoteStream.getTracks().includes(t)) remoteStream.addTrack(t);
+        });
+        // Capture the first remote audio track for the recorder module
+        const audio = remoteStream.getAudioTracks()[0];
+        if (audio) entry.audioTrackForRec = audio;
+        addTile(peerId, name, remoteStream, false);
+    };
+
+    pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+            state.ws.send(JSON.stringify({ type: 'ice-candidate', target: peerId, candidate: ev.candidate }));
+        }
+    };
+
+    if (initiator) {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        state.ws.send(JSON.stringify({ type: 'offer', target: peerId, sdp: offer }));
+    }
+
+    return entry;
+}
+
+function removePeer(peerId) {
+    const p = state.peers.get(peerId);
+    if (!p) return;
+    try { p.pc.close(); } catch {}
+    state.peers.delete(peerId);
+    const tile = document.getElementById('tile-' + peerId);
+    if (tile) tile.remove();
+    if (window.Recorder) window.Recorder.onPeerLeft(peerId);
+}
+
+/* ---------- Video tiles ---------- */
+function addTile(id, name, stream, isLocal) {
+    const tileId = 'tile-' + id;
+    if (document.getElementById(tileId)) return;
+
+    const tile = document.createElement('div');
+    tile.id = tileId;
+    tile.className = 'video-tile relative bg-slate-900 border border-slate-800 rounded-xl overflow-hidden aspect-video ' + (isLocal ? '' : 'remote');
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = isLocal;               // avoid local echo
+    video.srcObject = stream;
+    video.className = 'w-full h-full object-cover bg-black';
+
+    const label = document.createElement('div');
+    label.className = 'absolute bottom-2 right-2 text-xs bg-black/60 px-2 py-1 rounded';
+    label.textContent = name;
+
+    tile.appendChild(video);
+    tile.appendChild(label);
+    $('grid').appendChild(tile);
+}
+
+function updateCount() {
+    $('lblCount').textContent = `${state.peers.size + 1} / ${state.max}`;
+}
+
+/* ---------- Controls: cam / mic / screen ---------- */
+$('btnCam').addEventListener('click', () => {
+    state.camOn = !state.camOn;
+    state.localStream.getVideoTracks().forEach(t => (t.enabled = state.camOn));
+    $('btnCam').classList.toggle('bg-red-600', !state.camOn);
+    $('btnCam').classList.toggle('bg-slate-800', state.camOn);
+});
+
+$('btnMic').addEventListener('click', () => {
+    state.micOn = !state.micOn;
+    state.localStream.getAudioTracks().forEach(t => (t.enabled = state.micOn));
+    $('btnMic').classList.toggle('bg-red-600', !state.micOn);
+    $('btnMic').classList.toggle('bg-slate-800', state.micOn);
+});
+
+$('btnScreen').addEventListener('click', toggleScreen);
+
+async function toggleScreen() {
+    if (!state.screenOn) {
+        try {
+            const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            state.screenStream = s;
+            state.screenOn = true;
+            const track = s.getVideoTracks()[0];
+
+            // Replace outbound video track for each peer
+            for (const { pc } of state.peers.values()) {
+                const sender = pc.getSenders().find(x => x.track && x.track.kind === 'video');
+                if (sender) sender.replaceTrack(track);
+            }
+            // Update local tile
+            const localVid = document.querySelector('#tile-local video');
+            if (localVid) localVid.srcObject = s;
+            track.onended = () => { if (state.screenOn) toggleScreen(); };
+            $('btnScreen').classList.add('bg-emerald-600');
+            $('btnScreen').classList.remove('bg-slate-800');
+        } catch (e) { /* user cancelled */ }
+    } else {
+        state.screenStream?.getTracks().forEach(t => t.stop());
+        state.screenStream = null;
+        state.screenOn = false;
+        const camTrack = state.localStream.getVideoTracks()[0];
+        for (const { pc } of state.peers.values()) {
+            const sender = pc.getSenders().find(x => x.track && x.track.kind === 'video');
+            if (sender && camTrack) sender.replaceTrack(camTrack);
+        }
+        const localVid = document.querySelector('#tile-local video');
+        if (localVid) localVid.srcObject = state.localStream;
+        $('btnScreen').classList.remove('bg-emerald-600');
+        $('btnScreen').classList.add('bg-slate-800');
+    }
+}
+
+/* ---------- Recording ---------- */
+let recording = false;
+$('btnRec').addEventListener('click', () => {
+    if (!recording) {
+        const mode = document.querySelector('input[name="recMode"]:checked').value;
+        window.Recorder.start({
+            mode,
+            localName: state.name,
+            localStream: state.localStream,
+            peers: state.peers,
+        });
+        recording = true;
+        $('recLabel').textContent = 'إيقاف التسجيل';
+        $('recIcon').classList.add('rec-dot');
+        $('recHint').textContent = mode === 'mixed'
+            ? 'التسجيل: ملف صوتي واحد مدمج لجميع المشاركين.'
+            : 'التسجيل: ملف صوتي منفصل لكل مشارك — مع مزامنة زمنية.';
+        $('recHint').classList.remove('hidden');
+    } else {
+        window.Recorder.stop();
+        recording = false;
+        $('recLabel').textContent = 'بدء التسجيل';
+        $('recIcon').classList.remove('rec-dot');
+        $('recHint').classList.add('hidden');
+    }
+});
+
+/* ---------- Copy invite link / Leave ---------- */
+$('btnCopyLink').addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(state.roomId)}`;
+    try { await navigator.clipboard.writeText(url); $('btnCopyLink').textContent = 'تم النسخ ✓'; }
+    catch { prompt('انسخ الرابط:', url); }
+    setTimeout(() => ($('btnCopyLink').textContent = 'نسخ رابط الدعوة'), 1500);
+});
+
+$('btnLeave').addEventListener('click', () => {
+    try { state.ws?.close(); } catch {}
+    state.localStream?.getTracks().forEach(t => t.stop());
+    state.screenStream?.getTracks().forEach(t => t.stop());
+    location.href = location.pathname;
+});
+</script>
+</body>
+</html>
